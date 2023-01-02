@@ -2,29 +2,27 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const mysql = require("mysql2");
 const nodemailer = require('nodemailer');
-
-var transporter = nodemailer.createTransport({
-    host: "mail.time-watch.eu",
-    port: 465,
-    secure: false,
-    auth: {
-        user: 'info@time-watch.eu',
-        pass: 'mv&5O10v4'
-    }
-});
+const bcrypt = require("bcrypt");
 
 const app = express();
 app.use(bodyParser());
 
+// Nodemailer Einstellungen
+var transporter = nodemailer.createTransport({
+    service: "Gmail",
+    auth: {
+        user: 'rest.timewatch@gmail.com',
+        pass: 'abchpejusfeiiwcv'
+    }
+});
+
+// server ist gestartet rückmeldung
 app.listen(3000, () => {
     console.log("Server started ...");
     console.log("Stop server with STRG + c")
 });
 
-app.get("/", (req, res) => {
-    res.send("Hello From The Server");
-})
-
+// Mysql Einstellungen
 const connection = mysql.createConnection({
     host: "localhost",
     user: "zeitmanagmentdb",
@@ -32,16 +30,44 @@ const connection = mysql.createConnection({
     database: "zeitmanagmentdb"
 });
 
+// Mysql Connaction Test
 connection.connect((err) => {
     if (err) throw err;
     console.log("Connected successfully to MySql server")
 });
 
+// Resetcode anfordern
+function resetcode() {
+    let codecheck = 1;
+    let code = 1;
 
-function sissoncode() {
-    return Math.floor(Math.random() * 900000) + 100000;
+    while (codecheck != 0) {
+        console.log("inschleife")
+        code = Math.floor(Math.random() * 900000) + 100000;
+        codecheck = codeexist(code);
+    }
+    return code;
 }
 
+// Reset Code check in der mysql Datenbank
+function codeexist(code) {
+    let randomid = 0;
+    console.log("chekcode")
+    let query = `SELECT EXISTS(SELECT resetcode from zeitmanagmentdb WHERE resetcode="`+ code +`")as code;`;
+
+    connection.query(query, (err, result) => {
+        console.log(result[0].code);
+
+        if (result[0].code === 0 ) {
+            console.log("Code Existiert nicht");
+            randomid = 1;
+        }
+
+    });
+    return randomid;
+}
+
+// E-Mail eingabe Check
 function validateEmail(email) {
     let errors = [];
 
@@ -63,6 +89,7 @@ function validateEmail(email) {
     return errors;
 }
 
+// Password eingabe Check
 function validatepassword(password) {
     let errors = [];
     if (password.length == 0) {
@@ -71,7 +98,46 @@ function validatepassword(password) {
     return errors;
 }
 
-app.post("/api/login", (req, res) => {
+// Password erstellen check
+function passwordrestcheck(password, password2) {
+
+    let errors = [];
+    var format = /[ `!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/;
+
+    console.log(password, password2);
+    // Password und Password confirm gleich
+    if (password2 != password) {
+        errors.push("TMSB:1004");
+    }
+
+    // password nicht null
+    if (password.length == 0) {
+        errors.push("TMSB:1001");
+    }
+
+    //password über 8 zeichen
+    if (password.length <= 8) {
+        errors.push("TMSB:1002");
+    }
+
+    //password hat sondertzeichen
+    if (!format.test(password)) {
+        errors.push("TMSB:1003");
+    }
+
+    return errors;
+}
+
+async function hash(password) {
+    const salt = await bcrypt.genSalt(10);
+
+    const password2 = await bcrypt.hash(password, salt);
+    console.log(password2);
+    return password2;
+}
+
+// login System
+app.post("/api/login",async (req, res) => {
     console.log("Requesey..	");
     let email = req.body.email;
     let password = req.body.password;
@@ -83,7 +149,7 @@ app.post("/api/login", (req, res) => {
 
     if (errEmail.length || errpassword.length) {
         res.json(200, {
-            msg: "Validation Failed",
+            msg: "TMS:1010",
             errors: {
                 password: errpassword,
                 email: errEmail
@@ -108,30 +174,27 @@ app.post("/api/login", (req, res) => {
         });
 
 
-
         query = `SELECT \`password\` from zeitmanagmentdb WHERE email=` + `"` + email + `"`;
-        connection.query(query, (err, result) => {
+        connection.query(query, async (err, result) => {
 
-            Object.keys(result).forEach(function(key) {
-                var row = result[key];
-                console.log("Password:"+ row.password)
+            result.password
+            console.log("Password:" + result[0].password)
 
-                if (password === row.password) {
-                    console.log("Richtig");
+            if (await bcrypt.compare(password, result[0].password)) {
+                console.log("Richtig");
 
-                    res.json(200, {
-                        msg: "TMS:1001",
+                res.json(200, {
+                    msg: "TMS:1001",
 
-                    })
+                })
 
 
-                } else {
-                    console.log("Falsch");
-                    res.json(200, {
-                        msg: "TMS:1002",
-                    })
-                }
-            });
+            } else {
+                console.log("Falsch");
+                res.json(200, {
+                    msg: "TMS:1002",
+                })
+            }
 
             if (err) {
                 // status code 500 is for Internal Server Error
@@ -146,7 +209,7 @@ app.post("/api/login", (req, res) => {
     }
 });
 
-
+// Reset code erstellen und E-Mail senden an den entsprechenden Nutzer
 app.post("/api/reset", (req, res) => {
     console.log("Requesey..	");
     let email = req.body.email;
@@ -161,7 +224,7 @@ app.post("/api/reset", (req, res) => {
         });
     } else {
         var mailOptions = {
-            from: 'info@time-watch.eu',
+            from: 'rest.timewatch@gmail.com',
             to: email,
             subject: 'TimeWatch - Passwort Zurücksetzen',
             text: '1 Test'
@@ -181,7 +244,14 @@ app.post("/api/reset", (req, res) => {
                 });
             } else {
 
-                mailOptions.text = "Ihr Passwort Reset Code Lautet: " + sissoncode();
+                const code = resetcode();
+                mailOptions.text = "Ihre Persönliche Reset URL lautet: http://localhost:8080/Login/reset/" + code;
+
+                let query = `UPDATE zeitmanagmentdb SET resetcode="` + code + `" WHERE email="`+ email +`";`;
+
+                connection.query(query, (err, result) => {
+
+                });
 
                 transporter.sendMail(mailOptions, function(error, info){
                     if (error) {
@@ -201,4 +271,67 @@ app.post("/api/reset", (req, res) => {
 
 });
 
-// https://medium.com/@vrajshah01/form-processing-using-vue-js-and-node-js-c5b32ea0ba44
+// reset code Abfrage für die Reset seite.
+app.post("/api/reset/code", (req, res) => {
+    console.log("Requesey..	");
+    let code = req.body.code;
+    console.log(code);
+
+    let query = `SELECT EXISTS(SELECT resetcode from zeitmanagmentdb WHERE resetcode="`+ code +`")as code;`;
+
+    connection.query(query, (err, result) => {
+        console.log(result[0].code);
+
+        if (result[0].code === 0 ) {
+            console.log("Falschercode");
+
+            res.json(200, {
+                msg: "TMS:1006",
+            });
+        } else {
+            res.json(200, {
+                msg: "TMS:1007",
+            });
+        }
+
+    });
+
+});
+
+// password reset
+app.post("/api/reset/code/password",async (req, res) => {
+    console.log("Requesey..	");
+
+    let password = req.body.password;
+    let passwordconfirm = req.body.passwordconfirm;
+    let code = req.body.code;
+
+    const error = passwordrestcheck(password, passwordconfirm)
+
+    console.log(error)
+
+    if (error.length != "") {
+        res.json(200, {
+            msg: "TMS:1008",
+        });
+    } else {
+
+            const salt = await bcrypt.genSalt(10);
+
+            const password2 = await bcrypt.hash(password, salt);
+
+            let query = `UPDATE zeitmanagmentdb SET password="` + password2 + `" WHERE resetcode="`+ code +`";`;
+            connection.query(query, (err, result) => {
+            });
+
+            //cnage restcode
+            query = `UPDATE zeitmanagmentdb SET resetcode= "" WHERE resetcode="`+ code +`";`;
+            connection.query(query, (err, result) => {
+            });
+
+            res.json(200, {
+                msg: "TMS:1009",
+            });
+
+    }
+});

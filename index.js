@@ -141,6 +141,7 @@ app.post("/api/login",async (req, res) => {
     console.log("Requesey..	");
     let email = req.body.email;
     let password = req.body.password;
+    let sesssioncode = "";
     console.log(email);
     console.log(password);
 
@@ -170,42 +171,53 @@ app.post("/api/login",async (req, res) => {
                     msg: "TMS:1003",
 
                 });
+            } else {
+
+                query = `SELECT \`password\` from zeitmanagmentdb WHERE email=` + `"` + email + `"`;
+
+                connection.query(query, async (err, result) => {
+
+                    console.log("Password:" + result[0].password)
+
+                    if (await bcrypt.compare(password, result[0].password)) {
+                        console.log("Richtig");
+
+                        query = `SELECT \`sessoincode\` from zeitmanagmentdb WHERE email=` + `"` + email + `"`;
+
+                        connection.query(query, async (err, result) => {
+
+                            sesssioncode = result[0].sessoincode;
+
+                            res.json(200, {
+                                msg: "TMS:1001",
+                                code: {
+                                    sessioncode: sesssioncode,
+                                    semail: email
+                                }
+                            })
+
+                        });
+
+                    } else {
+                        console.log("Falsch");
+                        res.json(200, {
+                            msg: "TMS:1002",
+                        })
+                    }
+
+                    if (err) {
+                        // status code 500 is for Internal Server Error
+                        res.json(500, {
+                            msg: "Some thing went wrong please try again"
+                        })
+                    }
+
+                    // if we reach till this point means record is inserted succesfully
+                })
+
+
             }
         });
-
-
-        query = `SELECT \`password\` from zeitmanagmentdb WHERE email=` + `"` + email + `"`;
-        connection.query(query, async (err, result) => {
-
-            result.password
-            console.log("Password:" + result[0].password)
-
-            if (await bcrypt.compare(password, result[0].password)) {
-                console.log("Richtig");
-
-                res.json(200, {
-                    msg: "TMS:1001",
-
-                })
-
-
-            } else {
-                console.log("Falsch");
-                res.json(200, {
-                    msg: "TMS:1002",
-                })
-            }
-
-            if (err) {
-                // status code 500 is for Internal Server Error
-                res.json(500, {
-                    msg: "Some thing went wrong please try again"
-                })
-            }
-
-            // if we reach till this point means record is inserted succesfully
-        })
-
     }
 });
 
@@ -305,6 +317,7 @@ app.post("/api/reset/code/password",async (req, res) => {
     let password = req.body.password;
     let passwordconfirm = req.body.passwordconfirm;
     let code = req.body.code;
+    let email = "";
 
     const error = passwordrestcheck(password, passwordconfirm)
 
@@ -316,11 +329,31 @@ app.post("/api/reset/code/password",async (req, res) => {
         });
     } else {
 
-            const salt = await bcrypt.genSalt(10);
+            let salt = await bcrypt.genSalt(10);
 
             const password2 = await bcrypt.hash(password, salt);
 
+            let sesssioncode = "";
+
+            // set New Password
             let query = `UPDATE zeitmanagmentdb SET password="` + password2 + `" WHERE resetcode="`+ code +`";`;
+            connection.query(query, (err, result) => {
+            });
+
+            // get email
+            query = `SELECT email from zeitmanagmentdb WHERE resetcode="` + code + `"`;
+            connection.query(query, (err, result) => {
+                sesssioncode = result[0].email + password;
+
+                email = result[0].email;
+                console.log(email);
+             });
+
+            sesssioncode = await bcrypt.hash(sesssioncode, salt);
+
+
+            // set Sessioncode
+            query = `UPDATE zeitmanagmentdb SET sessoincode= "` + sesssioncode + `" WHERE resetcode="`+ code +`";`;
             connection.query(query, (err, result) => {
             });
 
@@ -329,9 +362,55 @@ app.post("/api/reset/code/password",async (req, res) => {
             connection.query(query, (err, result) => {
             });
 
+
             res.json(200, {
                 msg: "TMS:1009",
-            });
+                code: {
+                    sessioncode: sesssioncode,
+                    semail: email
+                    }
+                });
 
+    }
+});
+
+//login with code
+app.post("/api/login/logincode",async (req, res) => {
+    let scode = req.body.scode;
+    let email = "";
+
+    console.log(scode);
+
+    if (scode === null) {
+        res.json(200, {
+            msg: "TMS:1011",
+        });
+    } else {
+        let query = `SELECT EXISTS(SELECT sessoincode from zeitmanagmentdb WHERE sessoincode="`+ scode +`")as code;`;
+        connection.query(query, (err, result) => {
+
+            if (result[0].code === 0 ) {
+                res.json(200, {
+                    msg: "TMS:1013",
+                });
+            } else {
+
+                query = `SELECT email from zeitmanagmentdb WHERE sessoincode="` + scode + `"`;
+                connection.query(query, (err, result) => {
+
+                    email = result[0].email;
+                    console.log(email);
+
+                    res.json(200, {
+                        msg: "TMS:1012",
+                        code: {
+                            semail: email
+                        }
+                    });
+
+                });
+            }
+
+        });
     }
 });

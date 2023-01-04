@@ -42,7 +42,6 @@ function resetcode() {
     let code = 1;
 
     while (codecheck != 0) {
-        console.log("inschleife")
         code = Math.floor(Math.random() * 900000) + 100000;
         codecheck = codeexist(code);
     }
@@ -52,14 +51,11 @@ function resetcode() {
 // Reset Code check in der mysql Datenbank
 function codeexist(code) {
     let randomid = 0;
-    console.log("chekcode")
     let query = `SELECT EXISTS(SELECT resetcode from zeitmanagmentdb WHERE resetcode="`+ code +`")as code;`;
 
     connection.query(query, (err, result) => {
-        console.log(result[0].code);
 
         if (result[0].code === 0 ) {
-            console.log("Code Existiert nicht");
             randomid = 1;
         }
 
@@ -104,7 +100,6 @@ function passwordrestcheck(password, password2) {
     let errors = [];
     var format = /[ `!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/;
 
-    console.log(password, password2);
     // Password und Password confirm gleich
     if (password2 != password) {
         errors.push("TMSB:1004");
@@ -132,18 +127,15 @@ async function hash(password) {
     const salt = await bcrypt.genSalt(10);
 
     const password2 = await bcrypt.hash(password, salt);
-    console.log(password2);
     return password2;
 }
 
 // login System
 app.post("/api/login",async (req, res) => {
-    console.log("Requesey..	");
+
     let email = req.body.email;
     let password = req.body.password;
     let sesssioncode = "";
-    console.log(email);
-    console.log(password);
 
     let errEmail = validateEmail(email);
     let errpassword = validatepassword(password);
@@ -162,10 +154,8 @@ app.post("/api/login",async (req, res) => {
         let query = `SELECT EXISTS(SELECT email from zeitmanagmentdb WHERE email="`+ email +`")as email;`;
 
         connection.query(query, (err, result) => {
-            console.log(result[0].email);
 
             if (result[0].email === 0 ) {
-                console.log("Falschemail");
 
                 res.json(200, {
                     msg: "TMS:1003",
@@ -177,10 +167,7 @@ app.post("/api/login",async (req, res) => {
 
                 connection.query(query, async (err, result) => {
 
-                    console.log("Password:" + result[0].password)
-
                     if (await bcrypt.compare(password, result[0].password)) {
-                        console.log("Richtig");
 
                         query = `SELECT \`sessoincode\` from zeitmanagmentdb WHERE email=` + `"` + email + `"`;
 
@@ -199,7 +186,6 @@ app.post("/api/login",async (req, res) => {
                         });
 
                     } else {
-                        console.log("Falsch");
                         res.json(200, {
                             msg: "TMS:1002",
                         })
@@ -223,14 +209,11 @@ app.post("/api/login",async (req, res) => {
 
 // Reset code erstellen und E-Mail senden an den entsprechenden Nutzer
 app.post("/api/reset", (req, res) => {
-    console.log("Requesey..	");
     let email = req.body.email;
-    console.log(email);
 
     let errEmail = validateEmail(email);
 
     if (errEmail.length) {
-        console.log("a")
         res.json(200, {
             msg: "TMS:1004",
         });
@@ -248,7 +231,6 @@ app.post("/api/reset", (req, res) => {
             console.log(result[0].email);
 
             if (result[0].email === 0 ) {
-                console.log("Falschemail");
 
                 res.json(200, {
                     msg: "TMS:1005",
@@ -267,9 +249,7 @@ app.post("/api/reset", (req, res) => {
 
                 transporter.sendMail(mailOptions, function(error, info){
                     if (error) {
-                        console.log(error);
                     } else {
-                        console.log('Email sent: ' + info.response);
 
                         res.json(200, {
                             msg: "TMS:1005",
@@ -285,17 +265,13 @@ app.post("/api/reset", (req, res) => {
 
 // reset code Abfrage für die Reset seite.
 app.post("/api/reset/code", (req, res) => {
-    console.log("Requesey..	");
     let code = req.body.code;
-    console.log(code);
 
     let query = `SELECT EXISTS(SELECT resetcode from zeitmanagmentdb WHERE resetcode="`+ code +`")as code;`;
 
     connection.query(query, (err, result) => {
-        console.log(result[0].code);
 
         if (result[0].code === 0 ) {
-            console.log("Falschercode");
 
             res.json(200, {
                 msg: "TMS:1006",
@@ -312,7 +288,6 @@ app.post("/api/reset/code", (req, res) => {
 
 // password reset
 app.post("/api/reset/code/password",async (req, res) => {
-    console.log("Requesey..	");
 
     let password = req.body.password;
     let passwordconfirm = req.body.passwordconfirm;
@@ -320,8 +295,6 @@ app.post("/api/reset/code/password",async (req, res) => {
     let email = "";
 
     const error = passwordrestcheck(password, passwordconfirm)
-
-    console.log(error)
 
     if (error.length != "") {
         res.json(200, {
@@ -346,7 +319,6 @@ app.post("/api/reset/code/password",async (req, res) => {
                 sesssioncode = result[0].email + password;
 
                 email = result[0].email;
-                console.log(email);
              });
 
             sesssioncode = await bcrypt.hash(sesssioncode, salt);
@@ -376,10 +348,9 @@ app.post("/api/reset/code/password",async (req, res) => {
 
 //login with code
 app.post("/api/login/logincode",async (req, res) => {
+
     let scode = req.body.scode;
     let email = "";
-
-    console.log(scode);
 
     if (scode === null) {
         res.json(200, {
@@ -399,7 +370,6 @@ app.post("/api/login/logincode",async (req, res) => {
                 connection.query(query, (err, result) => {
 
                     email = result[0].email;
-                    console.log(email);
 
                     res.json(200, {
                         msg: "TMS:1012",
@@ -413,4 +383,40 @@ app.post("/api/login/logincode",async (req, res) => {
 
         });
     }
+});
+
+//admincheck
+app.post("/api/admincheck",async (req, res) => {
+
+    let email = req.body.mail;
+    let query = `SELECT admin from zeitmanagmentdb WHERE email="` + email + `"`;
+
+    connection.query(query, (err, result) => {
+
+        if (result[0].admin === 1) {
+            res.json(200, {
+                msg: "TMS:1014",
+            });
+        }
+
+    });
+
+});
+
+//verwaltungcheck
+app.post("/api/verwaltungcheck",async (req, res) => {
+
+    let email = req.body.mail;
+    let query = `SELECT verwaltung from zeitmanagmentdb WHERE email="` + email + `"`;
+
+    connection.query(query, (err, result) => {
+
+        if (result[0].verwaltung === 1) {
+            res.json(200, {
+                msg: "TMS:1015",
+            });
+        }
+
+    });
+
 });

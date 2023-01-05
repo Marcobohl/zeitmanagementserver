@@ -420,3 +420,73 @@ app.post("/api/verwaltungcheck",async (req, res) => {
     });
 
 });
+
+//username get
+app.post("/api/username",async (req, res) => {
+    let email = req.body.mail;
+    let query = `SELECT vorname from zeitmanagmentdb WHERE email="` + email + `"`;
+    let name = "";
+
+    connection.query(query, (err, result) => {
+
+            name = result[0].vorname;
+
+            res.json(200, {
+                msg: "TMS:1016",
+                data: {
+                    name: name
+                }
+            });
+    });
+});
+
+//login with code admin
+app.post("/api/login/logincode/admin",async (req, res) => {
+
+    let scode = req.body.scode;
+    let email = "";
+    let admin = "0";
+
+    if (scode === null) {
+        res.json(200, {
+            msg: "TMS:1011",
+        });
+    } else {
+        let query = `SELECT EXISTS(SELECT sessoincode from zeitmanagmentdb WHERE sessoincode="`+ scode +`")as code;`;
+        connection.query(query, (err, result) => {
+
+            if (result[0].code === 0 ) {
+                res.json(200, {
+                    msg: "TMS:1013",
+                });
+            } else {
+
+                query = `SELECT email from zeitmanagmentdb WHERE sessoincode="` + scode + `"`;
+                connection.query(query, (err, result) => {
+
+                    email = result[0].email;
+
+                    query = `SELECT admin from zeitmanagmentdb WHERE sessoincode="` + scode + `"`;
+                    connection.query(query, (err, result) => {
+
+                        if (result[0].admin === 1) {
+                            admin = "1";
+                        }
+
+                        res.json(200, {
+                            msg: "TMS:1012",
+                            code: {
+                                semail: email,
+                                admin: admin
+                            }
+
+                    });
+
+                    });
+
+                });
+            }
+
+        });
+    }
+});

@@ -30,11 +30,48 @@ const connection = mysql.createConnection({
     database: "zeitmanagmentdb"
 });
 
+const connections = mysql.createConnection({
+    host: "localhost",
+    user: "zeitmanagmentdb",
+    password: "test",
+});
+
 // Mysql Connaction Test
 connection.connect((err) => {
     if (err) throw err;
     console.log("Connected successfully to MySql server")
 });
+
+
+// userid
+function usercode(name) {
+    let codecheck = 1;
+    let code = 1;
+    let username = name;
+
+    while (codecheck != 0) {
+        code = Math.floor(Math.random() * 900000) + 100000;
+        codecheck = useridexist(username + code);
+    }
+    return username + code;
+}
+
+// userid check in der mysql Datenbank
+function useridexist(code) {
+    let randomid = 0;
+    let query = `SELECT EXISTS(SELECT userid from zeitmanagmentdb WHERE userid="`+ code +`")as code;`;
+
+    connection.query(query, (err, result) => {
+
+        if (result[0].code === 0 ) {
+            randomid = 1;
+        }
+
+    });
+    return randomid;
+}
+
+
 
 // Resetcode anfordern
 function resetcode() {
@@ -239,7 +276,7 @@ app.post("/api/reset", (req, res) => {
             } else {
 
                 const code = resetcode();
-                mailOptions.text = "Ihre Persönliche Reset URL lautet: http://localhost:8080/Login/reset/" + code;
+                mailOptions.text = "Ihre Persönliche Reset URL lautet: http://localhost:8080/login/reset/" + code;
 
                 let query = `UPDATE zeitmanagmentdb SET resetcode="` + code + `" WHERE email="`+ email +`";`;
 
@@ -490,3 +527,198 @@ app.post("/api/login/logincode/admin",async (req, res) => {
         });
     }
 });
+
+//login with code admin
+app.post("/api/createuser",async (req, res) => {
+
+    let semail = req.body.email;
+    let svorname = req.body.vorname;
+    let snachname = req.body.nachname;
+    let sverwaltung = req.body.verwaltung;
+    let sadmin = req.body.admin;
+    let sarbeitszeit = req.body.arbeitszeit;
+    let spausenzeit = req.body.pausenzeit;
+    let scode = resetcode();
+    let userid = usercode(svorname)
+
+    var mailOptions = {
+        from: 'rest.timewatch@gmail.com',
+        to: semail,
+        subject: 'TimeWatch - Willkommen',
+        text: '1 Test'
+    };
+
+    let salt = await bcrypt.genSalt(10);
+
+    const password2 = await bcrypt.hash(semail, salt);
+
+
+    let errEmail = validateEmail(semail);
+
+    if (errEmail.length) {
+        res.json(200, {
+            msg: "TMS:1010",
+            errors: {
+                email: errEmail
+            }
+        });
+    } else {
+
+        let query = `SELECT EXISTS(SELECT email from zeitmanagmentdb WHERE email="`+ semail +`")as mail;`;
+        connection.query(query, (err, result) => {
+
+
+            if (result[0].mail === 1) {
+                res.json(200, {
+                    msg: "TMS:1017",
+                });
+            } else {
+
+                if (sadmin === true) {
+                    sadmin = 1;
+                } else {
+                    sadmin = 0;
+                }
+
+                if (sverwaltung === true) {
+                    sverwaltung = 1;
+                } else {
+                    sverwaltung = 0;
+                }
+
+
+                    let query = `INSERT INTO zeitmanagmentdb (email, password, resetcode, sessoincode, admin, verwaltung, vorname, nachname, arbeitzeit, pause, userid) VALUES ( "` + semail + `", "` + password2 + `", "` + scode + `", null, "` + sadmin + `", "` + sverwaltung + `", "` + svorname + `", "` + snachname + `", "` + sarbeitszeit + `", "` + spausenzeit + `", "` + userid + `")`;
+                    connection.query(query, (err, result) => {
+
+                        let query = `create table ` + userid + ` ( datum int unsigned not null auto_increment primary key, start timestamp not null, ende varchar(255) not null, pausestart varchar(255) not null, pauseend varchar(255) null)`;
+                        connection.query(query, (err, result) => {
+
+                            console.log(err);
+
+                            mailOptions.text = "Herzlich Willkommen bei TimeWatch, bitte erstellen sie über ihren Persönlichen Password link ihr Password: http://localhost:8080/login/reset/" + scode;
+
+                            transporter.sendMail(mailOptions, function(error, info){
+                                if (error) {
+                                } else {
+
+
+                                    res.json(200, {
+                                        msg: "TMS:1019",
+                                    });
+                                }
+                            });
+
+                        });
+
+                    });
+            }
+        });
+
+    }
+
+});
+
+//load user Tabels
+app.get("/api/loadusertabel",async (req, res) => {
+
+
+    let query = "SELECT * FROM zeitmanagmentdb";
+
+    connection.query(query, (err, result) => {
+        if (err) {
+            res.json(500, {
+                msg: "Internal Server Error Please Try Again"
+            })
+        }
+
+        res.send(200, {
+            msg: "All the data fetched successfully",
+            data: result
+        })
+    })
+});
+
+// remove user and all tabel
+app.post("/api/removeuser",async (req, res) => {
+    let email = req.body.email;
+    let user= req.body.user;
+    let id = req.body.id;
+
+    if (user === email) {
+
+        res.json(200, {
+            msg: "TMS:1021",
+        });
+
+    } else {
+
+        let query = `Drop table ` + id ;
+        connection.query(query, (err, result) => {
+
+            query = `DELETE FROM zeitmanagmentdb WHERE userid = "`+ id +`";`;
+            connection.query(query, (err, result) => {
+                res.json(200, {
+                    msg: "TMS:1020",
+                });
+            });
+
+        });
+
+    }
+
+
+});
+
+//edit user
+app.post("/api/edituser",async (req, res) => {
+    let email = req.body.email;
+    let vorname = req.body.vorname;
+    let nachname = req.body.nachname;
+    let arbeitzeit = req.body.arbeitzeit;
+    let pause = req.body.pause;
+    let admin = req.body.admin;
+    let verwaltung = req.body.verwaltung;
+    let userid = req.body.userid;
+    console.log(email);
+    console.log(vorname);
+    console.log(nachname);
+    console.log(arbeitzeit);
+    console.log(pause);
+    console.log(admin);
+    console.log(verwaltung);
+    console.log(userid);
+
+    let errEmail = validateEmail(email);
+
+    if (errEmail.length) {
+        res.json(200, {
+            msg: "TMS:1004",
+            errors: {
+                email: errEmail
+            }
+        });
+    } else {
+
+        if (admin === true) {
+            admin = 1;
+        } else {
+            admin =  0
+        }
+
+        if (verwaltung === true) {
+            verwaltung = 1;
+        } else {
+            verwaltung =  0
+        }
+
+
+
+        let query = `UPDATE zeitmanagmentdb SET email="` + email + `", vorname="` + vorname + `", nachname="` + nachname + `", arbeitzeit="` + arbeitzeit + `", pause="` + pause + `", admin=` + admin + `, verwaltung=` + verwaltung + `  WHERE userid="` + userid +`"`;
+            connection.query(query, (err, result) => {
+                res.json(200, {
+                    msg: "TMS:1022",
+                });
+            });
+    }
+});
+

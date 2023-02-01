@@ -3,6 +3,7 @@ const bodyParser = require("body-parser");
 const mysql = require("mysql2");
 const nodemailer = require('nodemailer');
 const bcrypt = require("bcrypt");
+const {compareSync} = require("bcrypt");
 
 const app = express();
 app.use(bodyParser());
@@ -28,12 +29,6 @@ const connection = mysql.createConnection({
     user: "zeitmanagmentdb",
     password: "test",
     database: "zeitmanagmentdb"
-});
-
-const connections = mysql.createConnection({
-    host: "localhost",
-    user: "zeitmanagmentdb",
-    password: "test",
 });
 
 // Mysql Connaction Test
@@ -590,7 +585,7 @@ app.post("/api/createuser",async (req, res) => {
                     let query = `INSERT INTO zeitmanagmentdb (email, password, resetcode, sessoincode, admin, verwaltung, vorname, nachname, arbeitzeit, pause, userid) VALUES ( "` + semail + `", "` + password2 + `", "` + scode + `", null, "` + sadmin + `", "` + sverwaltung + `", "` + svorname + `", "` + snachname + `", "` + sarbeitszeit + `", "` + spausenzeit + `", "` + userid + `")`;
                     connection.query(query, (err, result) => {
 
-                        let query = `create table ` + userid + ` ( datum int unsigned not null auto_increment primary key, start timestamp not null, ende varchar(255) not null, pausestart varchar(255) not null, pauseend varchar(255) null)`;
+                        let query = `create table ` + userid + ` ( datum date not null primary key, start time, ende varchar(255), pausestart varchar(255), pauseend varchar(255))`;
                         connection.query(query, (err, result) => {
 
                             console.log(err);
@@ -722,3 +717,265 @@ app.post("/api/edituser",async (req, res) => {
     }
 });
 
+//pausenstart
+app.post("/api/pausenstart",async (req, res) => {
+    let email = req.body.email;
+    let datum = req.body.datum;
+    let pause = req.body.pause;
+
+    console.log(email);
+    console.log(pause);
+    console.log(datum);
+});
+
+//einbuchen
+app.post("/api/starttimer",async (req, res) => {
+    let semail = req.body.email;
+    let datum = req.body.datum;
+    let starttime = req.body.starttime;
+    let userids = "";
+
+
+    console.log(starttime);
+
+    let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        userids = result[0].userid;
+
+        query = `INSERT INTO ` + userids + ` (datum, start, ende, pausestart, pauseend) VALUES ( "` + datum + `", "` + starttime + `", null, null, null)`;
+
+        connection.query(query, (err, result) => {
+        });
+
+    });
+});
+
+app.post("/api/closeevent",async (req, res) => {
+    let semail = req.body.email;
+    let timer = req.body.timer;
+
+    console.log(timer);
+    console.log(semail);
+});
+
+app.post("/api/loadtimer", (req, res) => {
+    let semail = req.body.email;
+    let datum = req.body.datum;
+
+
+    let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        userid = result[0].userid;
+
+        query = `SELECT EXISTS(SELECT datum from `+ userid +` WHERE datum="`+ datum +`")as datums`;
+
+        connection.query(query, (err, result) => {
+
+            if (result[0].datums === 1) {
+
+                query = `SELECT start from `+ userid +` WHERE datum="`+ datum + `"`;
+
+                connection.query(query, (err, result) => {
+
+                     console.log("a" + result[0].start)
+
+                    if (result[0].start === null) {
+
+                        query = `SELECT gzeit from `+ userid +` WHERE datum="`+ datum + `"`;
+
+                        connection.query(query, (err, result) => {
+                            console.log(result[0].gzeit);
+
+                            const timer = new Date(result[0].gzeit)
+                            console.log(timer);
+
+                            res.json(200, {
+                                msg: "TMS:1024",
+                                data: {
+                                    timer: timer.getTime(),
+                                }
+                            });
+
+                        });
+
+
+                    } else {
+
+                        query = `SELECT gzeit from `+ userid +` WHERE datum="`+ datum + `"`;
+
+                        connection.query(query, (err, result) => {
+
+                            if (result[0].gzeit === null) {
+
+                                query = `SELECT start from `+ userid +` WHERE datum="`+ datum + `"`;
+
+                                connection.query(query, (err, result) => {
+
+                                    const heute = new Date();
+
+                                    let start = result[0].start;
+                                    let aktuell = heute.getTime();
+
+                                    var newDateObj = new Date(aktuell - start);
+
+                                    var newtime = new Date(heute.getTime() - newDateObj.getTime())
+                                    console.log(newtime);
+
+                                    let stunde
+                                    if (newDateObj.getHours() === 1 || newDateObj.getHours() === 2 || newDateObj.getHours() === 3 || newDateObj.getHours() === 4 || newDateObj.getHours() === 5 || newDateObj.getHours() === 6 || newDateObj.getHours() === 7 || newDateObj.getHours() === 8 || newDateObj.getHours() === 9) {
+                                        stunde = "0" + newDateObj.getHours();
+                                    } else if (newDateObj.getHours() === 0 ) {
+                                        stunde = "00"
+                                    } else {
+                                        stunde = newDateObj.getHours();
+                                    }
+
+                                    let sec
+                                    if (newDateObj.getSeconds() === 1 || newDateObj.getSeconds() === 2 || newDateObj.getSeconds() === 3 || newDateObj.getSeconds() === 4 || newDateObj.getSeconds() === 5 || newDateObj.getSeconds() === 6 || newDateObj.getSeconds() === 7 || newDateObj.getSeconds() === 8 || newDateObj.getSeconds() === 9) {
+                                        sec = "0" + newDateObj.getSeconds();
+                                    } else if (newDateObj.getSeconds() === 0 ) {
+                                        sec = "00"
+                                    } else {
+                                        sec = newDateObj.getSeconds();
+                                    }
+
+                                    let min
+                                    if (newDateObj.getMinutes() === 1 || newDateObj.getMinutes() === 2 || newDateObj.getMinutes() === 3 || newDateObj.getMinutes() === 4 || newDateObj.getMinutes() === 5 || newDateObj.getMinutes() === 6 || newDateObj.getMinutes() === 7 || newDateObj.getMinutes() === 8 || newDateObj.getMinutes() === 9) {
+                                        min = "0" + newDateObj.getMinutes();
+                                    } else if (newDateObj.getMinutes() === 0 ) {
+                                        min = "00"
+                                    } else {
+                                        min = newDateObj.getMinutes();
+                                    }
+
+                                    let time = stunde + ":" + min + ":" + sec;
+
+                                    res.json(200, {
+                                        msg: "TMS:1023",
+                                        data: {
+                                            heute: newtime.getTime(),
+                                            timer: time
+                                        }
+                                    });
+
+                                });
+
+                            } else {
+
+                                let gzeit;
+                                let akzeit;
+
+                                query = `SELECT gzeit from `+ userid +` WHERE datum="`+ datum + `"`;
+
+                                connection.query(query, (err, result) => {
+
+                                    gzeit = result[0].gzeit;
+
+                                    query = `SELECT start from `+ userid +` WHERE datum="`+ datum + `"`;
+
+                                    connection.query(query, (err, result) => {
+
+                                        akzeit = result[0].start;
+
+                                        console.log(gzeit);
+                                        console.log(akzeit);
+
+                                        gzeit = akzeit - gzeit;
+                                        console.log(gzeit);
+
+                                        const timer = new Date(gzeit)
+
+                                        res.json(200, {
+                                            msg: "TMS:1025",
+                                            data: {
+                                                timer: timer.getTime(),
+                                                gzeit: gzeit,
+                                            }
+                                        });
+
+                                    });
+
+
+                                });
+                            }
+
+
+                        });
+
+                    }
+                });
+
+            }
+            console.log(err)
+        });
+    });
+});
+
+//ausbuchen
+app.post("/api/stoptimer",async (req, res) => {
+    let semail = req.body.email;
+    let timer = req.body.timer;
+
+    let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        userid = result[0].userid;
+        const heute = new Date(timer);
+        const monat = heute.getMonth() + 1
+        const datum = heute.getFullYear() + "-" + monat + "-" + heute.getDate()
+        query = `SELECT start from `+ userid +` WHERE datum="`+ datum + `"`;
+
+        connection.query(query, (err, result) => {
+
+            let start = result[0].start;
+
+            query = `SELECT gzeit from `+ userid +` WHERE datum="`+ datum + `"`;
+
+            connection.query(query, (err, result) => {
+
+                let gzeit;
+                if (result[0].gzeit === undefined) {
+                    gzeit = new Date(heute.getTime() - start);
+                } else {
+                    gzeit = new Date(heute.getTime() - start + result[0].gzeit)   ;
+                }
+
+                query = `UPDATE ` + userid + ` SET start=` + null + `, gzeit="` + gzeit.getTime() + `" WHERE datum="` + datum +`"`;
+
+                connection.query(query, (err, result) => {
+                    console.log(err);
+                });
+            });
+
+        });
+
+    });
+});
+
+//ausbuchen
+app.post("/api/resumtworktimer",async (req, res) => {
+    let semail = req.body.email;
+    let timer = req.body.starttime;
+    let datum = req.body.datum;
+    let userid;
+
+    let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        userid = result[0].userid;
+        query = `UPDATE ` + userid + ` SET start="` + timer + `" WHERE datum="` + datum +`"`;
+
+        connection.query(query, (err, result) => {
+            console.log(err);
+
+        });
+
+
+    });
+});

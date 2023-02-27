@@ -674,14 +674,6 @@ app.post("/api/edituser",async (req, res) => {
     let admin = req.body.admin;
     let verwaltung = req.body.verwaltung;
     let userid = req.body.userid;
-    console.log(email);
-    console.log(vorname);
-    console.log(nachname);
-    console.log(arbeitzeit);
-    console.log(pause);
-    console.log(admin);
-    console.log(verwaltung);
-    console.log(userid);
 
     let errEmail = validateEmail(email);
 
@@ -978,4 +970,24 @@ app.post("/api/resumtworktimer",async (req, res) => {
 
 
     });
+});
+
+//ausbuchen
+app.post("/api/loadtimerlist",async (req, res) => {
+    let semail = req.body.email;
+
+    let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        query = "SELECT * FROM "+ result[0].userid;
+
+        connection.query(query, (err, result) => {
+
+            console.log(result);
+        });
+    });
+
+
+    console.log(semail);
 });

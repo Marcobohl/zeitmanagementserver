@@ -1087,3 +1087,70 @@ app.get("/api/emialsload",async (req, res) => {
         })
     })
 });
+
+//einbuchen pause
+app.post("/api/pausestarttimer",async (req, res) => {
+    let semail = req.body.email;
+    let datum = req.body.datum;
+    let starttime = req.body.starttime;
+    let userids = "";
+
+
+    console.log(starttime);
+    console.log(datum);
+
+    let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        userids = result[0].userid;
+
+        query = `UPDATE ` + userid + ` SET pausestart="` + starttime + `" WHERE datum="` + datum +`"`;
+
+        connection.query(query, (err, result) => {
+        });
+
+    });
+});
+
+//ausbuchen
+app.post("/api/pausestoptimer",async (req, res) => {
+    let semail = req.body.email;
+    let timer = req.body.stoptimer;
+
+    let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        userid = result[0].userid;
+        const heute = new Date(timer);
+        const monat = heute.getMonth() + 1
+        const datum = heute.getFullYear() + "-" + monat + "-" + heute.getDate()
+        query = `SELECT pausestart from `+ userid +` WHERE datum="`+ datum + `"`;
+
+        connection.query(query, (err, result) => {
+
+            let start = result[0].pausestart;
+
+            query = `SELECT gpause from `+ userid +` WHERE datum="`+ datum + `"`;
+
+            connection.query(query, (err, result) => {
+
+                let gzeit;
+                if (result[0].gzeit === undefined) {
+                    gzeit = new Date(heute.getTime() - start);
+                } else {
+                    gzeit = new Date(heute.getTime() - start + result[0].gzeit)   ;
+                }
+
+                query = `UPDATE ` + userid + ` SET pausestart=` + null + `, gpause="` + gzeit.getTime() + `" WHERE datum="` + datum +`"`;
+
+                connection.query(query, (err, result) => {
+                    console.log(err);
+                });
+            });
+
+        });
+
+    });
+});

@@ -585,7 +585,7 @@ app.post("/api/createuser",async (req, res) => {
                     let query = `INSERT INTO zeitmanagmentdb (email, password, resetcode, sessoincode, admin, verwaltung, vorname, nachname, arbeitzeit, pause, userid) VALUES ( "` + semail + `", "` + password2 + `", "` + scode + `", null, "` + sadmin + `", "` + sverwaltung + `", "` + svorname + `", "` + snachname + `", "` + sarbeitszeit + `", "` + spausenzeit + `", "` + userid + `")`;
                     connection.query(query, (err, result) => {
 
-                        let query = `create table ` + userid + ` ( datum date not null primary key, start time, ende varchar(255), pausestart varchar(255), pauseend varchar(255))`;
+                        let query = `create table ` + userid + ` ( datum date not null primary key, start bigint, ende bigint, pausestart bigint, pauseend bigint, gesamtarbeizeit bigint, gzeit bigint, gpause bigint)`;
                         connection.query(query, (err, result) => {
 
                             console.log(err);
@@ -817,34 +817,12 @@ app.post("/api/loadtimer", (req, res) => {
                                     var newtime = new Date(heute.getTime() - newDateObj.getTime())
                                     console.log(newtime);
 
-                                    let stunde
-                                    if (newDateObj.getHours() === 1 || newDateObj.getHours() === 2 || newDateObj.getHours() === 3 || newDateObj.getHours() === 4 || newDateObj.getHours() === 5 || newDateObj.getHours() === 6 || newDateObj.getHours() === 7 || newDateObj.getHours() === 8 || newDateObj.getHours() === 9) {
-                                        stunde = "0" + newDateObj.getHours();
-                                    } else if (newDateObj.getHours() === 0 ) {
-                                        stunde = "00"
-                                    } else {
-                                        stunde = newDateObj.getHours();
-                                    }
+                                    const stunde = newDateObj.getUTCHours().toString().padStart(2, '0');
+                                    const minuten = newDateObj.getUTCMinutes().toString().padStart(2, '0');
+                                    const sekunden = newDateObj.getUTCSeconds().toString().padStart(2, '0');
 
-                                    let sec
-                                    if (newDateObj.getSeconds() === 1 || newDateObj.getSeconds() === 2 || newDateObj.getSeconds() === 3 || newDateObj.getSeconds() === 4 || newDateObj.getSeconds() === 5 || newDateObj.getSeconds() === 6 || newDateObj.getSeconds() === 7 || newDateObj.getSeconds() === 8 || newDateObj.getSeconds() === 9) {
-                                        sec = "0" + newDateObj.getSeconds();
-                                    } else if (newDateObj.getSeconds() === 0 ) {
-                                        sec = "00"
-                                    } else {
-                                        sec = newDateObj.getSeconds();
-                                    }
 
-                                    let min
-                                    if (newDateObj.getMinutes() === 1 || newDateObj.getMinutes() === 2 || newDateObj.getMinutes() === 3 || newDateObj.getMinutes() === 4 || newDateObj.getMinutes() === 5 || newDateObj.getMinutes() === 6 || newDateObj.getMinutes() === 7 || newDateObj.getMinutes() === 8 || newDateObj.getMinutes() === 9) {
-                                        min = "0" + newDateObj.getMinutes();
-                                    } else if (newDateObj.getMinutes() === 0 ) {
-                                        min = "00"
-                                    } else {
-                                        min = newDateObj.getMinutes();
-                                    }
-
-                                    let time = stunde + ":" + min + ":" + sec;
+                                    let time = stunde + ":" + minuten + ":" + sekunden;
 
                                     res.json(200, {
                                         msg: "TMS:1023",
@@ -972,22 +950,140 @@ app.post("/api/resumtworktimer",async (req, res) => {
     });
 });
 
-//ausbuchen
+//lade die arbezietliste
 app.post("/api/loadtimerlist",async (req, res) => {
+    let semail = req.body.email;
+    let pause = 0;
+    let abzeit = 0;
+
+    let query = `SELECT pause, arbeitzeit from zeitmanagmentdb WHERE email= "`+ semail + `"`;
+
+    connection.query(query, (err, result) => {
+
+        console.log(result[0].pause);
+        console.log(result[0].arbeitzeit);
+
+        pause = result[0].pause;
+        abzeit = result[0].arbeitzeit;
+
+        query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
+
+        connection.query(query, (err, result) => {
+
+            query = "SELECT * FROM "+ result[0].userid;
+
+            connection.query(query, (err, result) => {
+
+                res.json(200, {
+                    msg: "TMS:1026",
+                    data: {
+                        data: result,
+                    },
+                    pause: {
+                        pause: pause,
+                    },
+                    abzeit: {
+                        abzeit: abzeit,
+                    }
+                });
+            });
+
+        });
+    });
+});
+
+//ausbuchen
+app.post("/api/ptimelod",async (req, res) => {
     let semail = req.body.email;
 
     let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
 
     connection.query(query, (err, result) => {
 
-        query = "SELECT * FROM "+ result[0].userid;
+        query = `SELECT pause from zeitmanagmentdb WHERE userid= "`+ result[0].userid + `"`;
 
         connection.query(query, (err, result) => {
 
-            console.log(result);
+            console.log(result[0].pause);
+
+
+            res.json(200, {
+                msg: "TMS:1027",
+                data: {
+                    data: result,
+                }
+            });
         });
     });
+});
+
+//login with code verwaltung
+app.post("/api/login/logincode/verwaltung",async (req, res) => {
+
+    let scode = req.body.scode;
+    let email = "";
+    let admin = "0";
+
+    if (scode === null) {
+        res.json(200, {
+            msg: "TMS:1011",
+        });
+    } else {
+        let query = `SELECT EXISTS(SELECT sessoincode from zeitmanagmentdb WHERE sessoincode="`+ scode +`")as code;`;
+        connection.query(query, (err, result) => {
+
+            if (result[0].code === 0 ) {
+                res.json(200, {
+                    msg: "TMS:1013",
+                });
+            } else {
+
+                query = `SELECT email from zeitmanagmentdb WHERE sessoincode="` + scode + `"`;
+                connection.query(query, (err, result) => {
+
+                    email = result[0].email;
+
+                    query = `SELECT verwaltung from zeitmanagmentdb WHERE sessoincode="` + scode + `"`;
+                    connection.query(query, (err, result) => {
+
+                        if (result[0].verwaltung === 1) {
+                            admin = "1";
+                        }
+
+                        res.json(200, {
+                            msg: "TMS:1012",
+                            code: {
+                                semail: email,
+                                admin: admin
+                            }
+
+                        });
+
+                    });
+
+                });
+            }
+
+        });
+    }
+});
+
+//load user emails
+app.get("/api/emialsload",async (req, res) => {
 
 
-    console.log(semail);
+    let query = "SELECT email FROM zeitmanagmentdb";
+
+    connection.query(query, (err, result) => {
+        if (err) {
+            res.json(500, {
+                msg: "Internal Server Error Please Try Again"
+            })
+        }
+
+        res.send(200, {
+            msg: "All the data fetched successfully",
+            data: result
+        })
+    })
 });

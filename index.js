@@ -260,7 +260,6 @@ app.post("/api/reset", (req, res) => {
         let query = `SELECT EXISTS(SELECT email from zeitmanagmentdb WHERE email="`+ email +`")as email;`;
 
         connection.query(query, (err, result) => {
-            console.log(result[0].email);
 
             if (result[0].email === 0 ) {
 
@@ -588,7 +587,6 @@ app.post("/api/createuser",async (req, res) => {
                         let query = `create table ` + userid + ` ( datum date not null primary key, start bigint, ende bigint, pausestart bigint, pauseend bigint, gesamtarbeizeit bigint, gzeit bigint, gpause bigint)`;
                         connection.query(query, (err, result) => {
 
-                            console.log(err);
 
                             mailOptions.text = "Herzlich Willkommen bei TimeWatch, bitte erstellen sie über ihren Persönlichen Password link ihr Password: http://localhost:8080/login/reset/" + scode;
 
@@ -715,9 +713,6 @@ app.post("/api/pausenstart",async (req, res) => {
     let datum = req.body.datum;
     let pause = req.body.pause;
 
-    console.log(email);
-    console.log(pause);
-    console.log(datum);
 });
 
 //einbuchen
@@ -728,7 +723,6 @@ app.post("/api/starttimer",async (req, res) => {
     let userids = "";
 
 
-    console.log(starttime);
 
     let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
 
@@ -748,8 +742,6 @@ app.post("/api/closeevent",async (req, res) => {
     let semail = req.body.email;
     let timer = req.body.timer;
 
-    console.log(timer);
-    console.log(semail);
 });
 
 app.post("/api/loadtimer", (req, res) => {
@@ -773,17 +765,14 @@ app.post("/api/loadtimer", (req, res) => {
 
                 connection.query(query, (err, result) => {
 
-                     console.log("a" + result[0].start)
 
                     if (result[0].start === null) {
 
                         query = `SELECT gzeit from `+ userid +` WHERE datum="`+ datum + `"`;
 
                         connection.query(query, (err, result) => {
-                            console.log(result[0].gzeit);
 
                             const timer = new Date(result[0].gzeit)
-                            console.log(timer);
 
                             res.json(200, {
                                 msg: "TMS:1024",
@@ -815,7 +804,6 @@ app.post("/api/loadtimer", (req, res) => {
                                     var newDateObj = new Date(aktuell - start);
 
                                     var newtime = new Date(heute.getTime() - newDateObj.getTime())
-                                    console.log(newtime);
 
                                     const stunde = newDateObj.getUTCHours().toString().padStart(2, '0');
                                     const minuten = newDateObj.getUTCMinutes().toString().padStart(2, '0');
@@ -851,11 +839,7 @@ app.post("/api/loadtimer", (req, res) => {
 
                                         akzeit = result[0].start;
 
-                                        console.log(gzeit);
-                                        console.log(akzeit);
-
                                         gzeit = akzeit - gzeit;
-                                        console.log(gzeit);
 
                                         const timer = new Date(gzeit)
 
@@ -880,7 +864,6 @@ app.post("/api/loadtimer", (req, res) => {
                 });
 
             }
-            console.log(err)
         });
     });
 });
@@ -918,7 +901,6 @@ app.post("/api/stoptimer",async (req, res) => {
                 query = `UPDATE ` + userid + ` SET start=` + null + `, gzeit="` + gzeit.getTime() + `" WHERE datum="` + datum +`"`;
 
                 connection.query(query, (err, result) => {
-                    console.log(err);
                 });
             });
 
@@ -942,7 +924,6 @@ app.post("/api/resumtworktimer",async (req, res) => {
         query = `UPDATE ` + userid + ` SET start="` + timer + `" WHERE datum="` + datum +`"`;
 
         connection.query(query, (err, result) => {
-            console.log(err);
 
         });
 
@@ -959,9 +940,6 @@ app.post("/api/loadtimerlist",async (req, res) => {
     let query = `SELECT pause, arbeitzeit from zeitmanagmentdb WHERE email= "`+ semail + `"`;
 
     connection.query(query, (err, result) => {
-
-        console.log(result[0].pause);
-        console.log(result[0].arbeitzeit);
 
         pause = result[0].pause;
         abzeit = result[0].arbeitzeit;
@@ -1003,8 +981,6 @@ app.post("/api/ptimelod",async (req, res) => {
         query = `SELECT pause from zeitmanagmentdb WHERE userid= "`+ result[0].userid + `"`;
 
         connection.query(query, (err, result) => {
-
-            console.log(result[0].pause);
 
 
             res.json(200, {
@@ -1095,10 +1071,6 @@ app.post("/api/pausestarttimer",async (req, res) => {
     let starttime = req.body.starttime;
     let userids = "";
 
-
-    console.log(starttime);
-    console.log(datum);
-
     let query = `SELECT userid from zeitmanagmentdb WHERE email="`+ semail + `"`;
 
     connection.query(query, (err, result) => {
@@ -1146,7 +1118,6 @@ app.post("/api/pausestoptimer",async (req, res) => {
                 query = `UPDATE ` + userid + ` SET pausestart=` + null + `, gpause="` + gzeit.getTime() + `" WHERE datum="` + datum +`"`;
 
                 connection.query(query, (err, result) => {
-                    console.log(err);
                 });
             });
 
